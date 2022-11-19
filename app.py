@@ -5,15 +5,13 @@ import plotly.graph_objects as go
 import plotly.express as px
 import dash_bootstrap_components as dbc
 
-pd.set_option('display.max_rows', 20)
-pd.set_option('display.min_rows', 20)
-
-
 DATA_FILE = 'data/income_classes_processed.csv'
 
 # stylesheet with the .dbc class from dash-bootstrap-templates library
 dbc_css = "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates/dbc.min.css"
 app = Dash('Test Salary Plot', external_stylesheets=[dbc.themes.PULSE, dbc_css])
+server = app.server
+
 
 def combine_high_income_rows(df):
     min_income_threshold = 1500
