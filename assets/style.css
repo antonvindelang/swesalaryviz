@@ -1,0 +1,63 @@
+body {
+    background-color: #F8F8F8;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+
+h1 {
+    margin-top: 50px;
+    font-size: 40px;
+    color: #101010;
+    text-align: left;
+}
+
+p {
+    margin-left: 10px;
+    color: #101010;
+}
+
+.graphincometext {
+    padding: 10px;
+    margin-top: 50px;
+    text-align: center;
+}
+
+.githubimg {
+    margin-right: 5px;
+}
+
+.input {
+    margin-left: 20px;
+    margin-right: 20px;
+    margin-top: 5px;
+    margin-bottom: 20px;
+    width: 200px;
+}
+
+.dropdown {
+    margin-left: 40px;
+    margin-right: 20px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    width: 300px;
+}
+
+.dropdown .Select-control {
+    background-color: white;
+}
+
+.dropdown .Select-menu-outer {
+    background-color: white;
+}
+
+.dropdown .Select-value {
+    background-color: white;
+    color: white;
+    font-size: 14px;
+}
+
+.graph {
+    margin-top: 50px;
+}

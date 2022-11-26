@@ -5,7 +5,12 @@ import plotly.graph_objects as go
 import plotly.express as px
 import dash_bootstrap_components as dbc
 
-DATA_FILE = 'data/income_classes_processed.csv'
+INCOME_FILE = 'data/income_classes_processed.csv'
+INTERP_FILE = 'data/percentiles_processed.csv'
+
+df_income = pd.read_csv(INCOME_FILE)
+df_interp = pd.read_csv(INTERP_FILE)
+
 
 # stylesheet with the .dbc class from dash-bootstrap-templates library
 dbc_css = "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates/dbc.min.css"
@@ -14,87 +19,33 @@ app = Dash('Test Salary Plot', external_stylesheets=[
 server = app.server
 
 
-def combine_high_income_rows(df):
-    min_income_threshold = 1500
-    income_range_string = f'{min_income_threshold:,d}-'.replace(',', ' ')
-    mask = df['min_income'] >= min_income_threshold
-    group_by_headers = ['age_range', 'gender',
-                        'min_income', 'income', 'max_income']
-    df.loc[mask, 'min_income'] = min_income_threshold
-    df.loc[mask, 'max_income'] = ''
-    df.loc[mask, 'income'] = income_range_string
-    df = df.groupby(group_by_headers, as_index=False).sum()
-    return df
-
-
-# Processing data
-def calculate_percentiles(df):
-    group_by_headers = ['age_range', 'gender']
-    df['percent_of_people'] = df['number_of_people'] / \
-        df.groupby(group_by_headers)['number_of_people'].transform('sum')
-    df['percentile'] = df.groupby(group_by_headers)[
-        'percent_of_people'].cumsum()
-    df['percentile'] = df['percentile'] * 100
-    df['selected_income_bracket'] = False
-    return df
-
-
-def create_interpolation_series(df, percentiles):
-    x = df['percentile'].to_numpy()
-    y = df['min_income'].to_numpy()
-    return np.interp(percentiles, x, y, left=0)
-
-
-def create_interpolated_percentile_df(df):
-    percentile_dfs_list = []
-    percentiles = list(range(0, 101))
-    group_by_headers = ['age_range', 'gender']
-
-    for headers, group in df.groupby(group_by_headers):
-        interpolated_incomes = create_interpolation_series(group, percentiles)
-        group_df = pd.DataFrame({
-            'percentile': percentiles,
-            'interpolated_income': interpolated_incomes
-        })
-        group_df[group_by_headers[0]] = headers[0]
-        group_df[group_by_headers[1]] = headers[1]
-        percentile_dfs_list.append(group_df)
-    percentile_dfs = pd.concat(percentile_dfs_list)
-    percentile_dfs['selected_income_bracket'] = False
-    return percentile_dfs
-
-
-def process_data(df):
-    df = combine_high_income_rows(df)
-    df = calculate_percentiles(df)
-    df_interp = create_interpolated_percentile_df(df)
-    return df, df_interp
-
-
-source_df = pd.read_csv(DATA_FILE)
-df_income, df_interp = process_data(source_df)
-
-
 # App layout
 app.layout = dbc.Container(html.Div([
 
     html.Div(children=[
         dbc.Row([
-            html.Div(html.H1('Var är du på inkomstskalan?'))
+            html.Div(html.H1('Var är du på inkomstskalan?')),
+            html.P(
+                'Data baserat på 2020 års inkomstdata från SCB. Percentiler är interpolerade från mindre granulär data.'),
 
         ]),
         dbc.Row([
             dbc.Col(html.Div(children=[
+
                 html.H4('Din månadsinkomst före skatt är:'),
 
                 html.Div(children='''
             Jämför med åldersgrupp och kön (män, kvinnor eller samtliga).
             '''),
 
-                dcc.Input(id='salary-input', placeholder='0', type='text'),
+                dcc.Input(id='salary-input',
+                          className='input',
+                          placeholder='Din månadslön',
+                          type='text'),
 
                 dcc.Dropdown(
                     id="dropdown-age",
+                    className='dropdown',
                     options=["Totalt 20-64 år", "20-24 år", "25-29 år", "30-34 år",
                              "35-39 år", "40-44 år", "45-49 år", "50-54 år", "55-59 år", "60-64 år"],
                     value="Totalt 20-64 år"
@@ -102,6 +53,7 @@ app.layout = dbc.Container(html.Div([
 
                 dcc.Dropdown(
                     id="dropdown-gender",
+                    className='dropdown',
                     options=[
                         {'label': 'Kvinnor och män', 'value': 'Samtliga'},
                         {'label': 'Kvinnor', 'value': 'Kvinnor'},
@@ -112,13 +64,14 @@ app.layout = dbc.Container(html.Div([
             ])),
 
             dbc.Col(html.Div(children=[
-                html.Div(id='graph-income-text')
+                html.Div(id='graph-income-text', className='graphincometext')
             ]))
 
         ])]),
 
     dbc.Row(html.Div(children=[
         dcc.Graph(id="graph-income",
+                  className="graph",
                   config={'displayModeBar': False},
                   ),
     ])),
@@ -132,8 +85,12 @@ app.layout = dbc.Container(html.Div([
 
     dbc.Row(html.Div(children=[
         html.Footer('Data is sourced from Statistics Sweden'),
-        html.A('Checkout repository on github',
-               href='https://github.com/antonvindelang/swesalaryviz', target="_blank")
+
+        html.Img(id='github_img',
+                 className='githubimg',
+                 src="assets/GitHub-Mark-32px.png", height='16px'),
+        html.A('Check out the repository on github',
+               href='https://github.com/antonvindelang/swesalaryviz', target="_blank"),
     ]),
         style={'text-align': 'right'})
 
@@ -151,11 +108,30 @@ def create_income_figure(df):
             'number_of_people': 'Antal personer'
         },
         color='selected_income_bracket',
+        color_discrete_map={
+            False: "#A9A9A9",
+            True: "#3CB371"
+        },
+        hover_data={"selected_income_bracket": False}
     )
 
-    fig.update_layout(xaxis={'categoryorder': 'array',
-                      'categoryarray': df['income'].iloc[0:32]})  # TODO: Fix magic number
-    fig.update_layout(showlegend=False)
+    fig.update_layout(xaxis={
+        'categoryorder': 'array',
+        'categoryarray': df['income'].iloc[0:32],
+        'showgrid': False,
+        'fixedrange': True,
+    },  # TODO: Fix magic number
+        yaxis={
+            'fixedrange': True,
+            'showgrid': False,
+    },
+        showlegend=False,
+        title_text='Antal personer i vald grupp per årsinkomstsintervall',
+        font_family='Tahoma',
+        plot_bgcolor='#E8E8E8',
+        paper_bgcolor='#F8F8F8'
+    )
+
     fig.layout.xaxis.fixedrange = True
     fig.layout.yaxis.fixedrange = True
     return fig
@@ -169,7 +145,7 @@ def create_percentile_figure(df, age_range, gender, salary_input):
             monthly_salary = int(salary_input)
             yearly_salary = monthly_salary/1000*12
             percentile = masked_df[yearly_salary >=
-                                masked_df['interpolated_income']]['percentile'].iloc[-1]
+                                   masked_df['interpolated_income']]['percentile'].iloc[-1]
             masked_df['selected_income_bracket'] = masked_df['percentile'] == percentile
         except Exception as e:
             pass
@@ -183,8 +159,30 @@ def create_percentile_figure(df, age_range, gender, salary_input):
             'percentile': "Percentil",
             'interpolated_income': 'Genomsnittlig årsinkomst (tkr)'
         },
+        color_discrete_map={
+            False: "#A9A9A9",
+            True: "#3CB371"
+        },
+        hover_data={"selected_income_bracket": False}
     )
-    fig.update_layout(showlegend=False)
+
+    fig.update_layout(xaxis={
+        'showgrid': False,
+        'fixedrange': True,
+    },  # TODO: Fix magic number
+        yaxis={
+            'fixedrange': True,
+            'showgrid': False,
+            'range': [0, 1500]
+
+    },
+        showlegend=False,
+        title_text='Genomsnittlig årsinkomst per percentil',
+        font_family='Tahoma',
+        plot_bgcolor='#E8E8E8',
+        paper_bgcolor='#F8F8F8'
+    )
+
     fig.layout.xaxis.fixedrange = True
     fig.layout.yaxis.fixedrange = True
     return fig
@@ -208,7 +206,7 @@ def create_income_text(salary_input, df):
 
         return html.Div([
             html.P(
-                f"Du har en månadslön på {monthly_salary} kr. Det innebär en årslön på {yearly_salary} tkr."),
+                f"Du har en månadslön på {monthly_salary:,d} kr. Det innebär en årslön på {int(yearly_salary):,d} tkr."),
             html.P(f"{round(percent_of_people*100,1)}% av befolkningen i vald grupp tjänar inom spannet {income_bracket} tkr per år. Du tjänar mer än {round(percentile, 1)}% av personer inom vald grupp"),
         ])
     else:
@@ -224,7 +222,8 @@ def create_income_text(salary_input, df):
     Input("salary-input", "value")
 )
 def update_page(age_range, gender, salary_input):
-    figure_percentile = create_percentile_figure(df_interp, age_range, gender, salary_input)
+    figure_percentile = create_percentile_figure(
+        df_interp, age_range, gender, salary_input)
     income_mask = ((df_income['age_range'] == age_range)
                    & (df_income['gender'] == gender))
     df_income_masked = df_income.loc[income_mask].copy()
